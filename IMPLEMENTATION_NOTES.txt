@@ -1,0 +1,149 @@
+DTMF CODEC IMPLEMENTATION NOTES
+================================
+
+Project Structure:
+  /sessions/intelligent-great-mayer/mnt/projects/dtmf/
+  ├── scripts/
+  │   ├── dtmf_common.py    (Core library with encoding/decoding)
+  │   ├── dtmf_encode.py    (CLI encoder)
+  │   └── dtmf_decode.py    (CLI decoder)
+  ├── SKILL.md              (Skill documentation)
+  └── README.md             (GitHub-style README)
+
+Key Features Implemented:
+=========================
+
+1. ENCODING (dtmf_common.py::encode_dtmf_string)
+   - Generates sine waves at row and column frequencies
+   - Combines with equal amplitude
+   - Adds configurable pause between tones
+   - Supports all 16 standard DTMF digits (0-9, *, #, A-D)
+   - Normalizes output to prevent clipping
+
+2. DECODING (dtmf_common.py::decode_dtmf_audio)
+   - Segments audio by energy detection (5% threshold)
+   - Uses Goertzel algorithm for frequency detection
+   - Detects row (697-941 Hz) and column (1209-1633 Hz) frequencies
+   - Includes twist ratio checking (max 2.0:1 ratio)
+   - Energy threshold: 0.01 normalized RMS
+   - Frequency tolerance: ±20 Hz
+
+3. AUDIO I/O (dtmf_common.py)
+   - read_wav(): Loads WAV files (mono/stereo, 16/32-bit)
+   - write_wav(): Saves 16-bit mono WAV files
+   - Supports any sample rate (default 44100 Hz, also tested at 8000 Hz)
+
+4. GOERTZEL ALGORITHM
+   - More efficient than FFT for specific frequency detection
+   - Computes energy at each DTMF frequency
+   - Low computational overhead ideal for real-time applications
+   - Implementation: filters signal through tuned IIR filters
+
+CLI Tools:
+==========
+
+Encoder: python3 dtmf_encode.py <digits> <output.wav> [options]
+  Options:
+    --tone-duration MS      (default: 100 ms)
+    --pause-duration MS     (default: 100 ms)
+    --sample-rate RATE      (default: 44100 Hz)
+
+Decoder: python3 dtmf_decode.py <input.wav> [output.txt]
+  - Stdout if no output file specified
+  - Stderr for diagnostics
+
+Roundtrip Testing:
+==================
+
+Test data: "123456789*0#ABCD" (all 16 DTMF digits)
+Encoding: 4.00 seconds at 44100 Hz (176400 samples)
+Decoding: 100% accuracy roundtrip verified
+
+Additional test cases:
+  - "5551234#" (phone number simulation)
+  - "*#" (symbols only)
+  - "ABCD" (extended keys)
+  - Different sample rates (8000 Hz telephony standard)
+  - Variable tone/pause durations (65-200 ms)
+
+All tests PASSED.
+
+Technical Specifications:
+=========================
+
+ITU-T Q.23/Q.24 Compliance:
+  Row frequencies:     697, 770, 852, 941 Hz
+  Column frequencies:  1209, 1336, 1477, 1633 Hz
+  Minimum tone:        65 ms (ITU-T spec)
+  Minimum pause:       65 ms (ITU-T spec)
+  Default (implementation): 100 ms tone, 100 ms pause
+
+Signal Processing:
+  Segmentation:        5 ms frames, 5% of max energy threshold
+  Goertzel window:     Entire tone segment
+  Twist ratio check:   Max 2.0:1 (±3 dB, relaxed from ITU-T ±4 dB)
+  Frequency matching:  ±20 Hz tolerance
+  Multi-frequency check: Best vs 2nd-best >1.5x ratio
+
+Dependencies:
+  - numpy (array/signal processing)
+  - wave (standard library, WAV I/O)
+  - argparse (standard library, CLI)
+
+No external audio libraries required.
+
+Known Limitations:
+==================
+
+1. Noise sensitivity: Works well with clean signals; SNR <10dB may reduce accuracy
+2. Tone overlap: Assumes tones are well-separated with pauses
+3. Single digit per segment: Doesn't detect overlapping DTMF tones
+4. Frequency drift: Tolerates ±20 Hz (real analog systems may drift more)
+
+Future Enhancements:
+====================
+
+1. Dual-tone detection (simultaneous multiple digits)
+2. Real-time streaming decoder
+3. Speech recognition for DTMF tones (more robust in noise)
+4. Multiple sample rate support optimization
+5. Visualization tools (spectrum display)
+
+Files Summary:
+==============
+
+dtmf_common.py (14.6 KB):
+  - All core functionality
+  - Goertzel algorithm
+  - Encoding/decoding
+  - WAV I/O
+  - Roundtrip test
+
+dtmf_encode.py (2.2 KB):
+  - CLI wrapper around encode_dtmf_string
+  - Argument parsing
+  - Error handling
+
+dtmf_decode.py (1.4 KB):
+  - CLI wrapper around decode_dtmf_audio
+  - Argument parsing
+  - Error handling
+
+SKILL.md (6.6 KB):
+  - Comprehensive skill documentation
+  - Technical background
+  - Usage examples
+  - Algorithm explanation
+
+README.md (7.8 KB):
+  - GitHub-style documentation
+  - Quick start guide
+  - File structure
+  - Technical specifications
+  - Use cases
+
+Total: ~32 KB of code and documentation
+
+Version: 1.0
+Status: Complete and tested
+Last verified: 2026-03-29
